@@ -1,0 +1,78 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+.MainComponent {
+  display: flex;
+  background-color: #000; /* Set background color to black */
+  color: #fff; /* Set text color to white */
+}
+
+.left-panel {
+  flex: 1;
+  margin-right: 100px;
+}
+
+.tabs-container {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  background-color: #333; /* Set tab background color to dark gray */
+  border: 1px solid #666; /* Set tab border color to slightly lighter gray */
+  border-radius: 5px 5px 0 0;
+}
+
+.tab.active {
+  background-color: #444; /* Set active tab background color to slightly lighter dark gray */
+  border-bottom-color: transparent;
+}
+
+.tab-content {
+  border: 1px solid #666; /* Set content border color to slightly lighter gray */
+  border-radius: 0 0 5px 5px;
+  padding: 20px;
+}
+
+.right-panel {
+  flex: 1;
+}
