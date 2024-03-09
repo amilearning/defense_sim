@@ -1,5 +1,6 @@
 
 from pymongo import MongoClient
+from defense_sim.models.warsahll import warshall_and_single_row
 
 class DefenseArea:
     def __init__(self, area_id, tags):
@@ -28,7 +29,9 @@ class DefenseDataManager:
         self.db = self.client[db_name]
         self.defense_areas = self.db.defense_areas
         self.edges = self.db.edges
+        
         self.adj_matrix = self.db.adjacency_matrix
+        
 
     def store_adjacency_matrix(self, matrix):
         """
@@ -92,7 +95,22 @@ class DefenseDataManager:
         # Delete the defense area
         self.defense_areas.delete_one({"_id": area_id})
         self.edges.delete_many({"$or": [{"source_id": area_id}, {"target_id": area_id}]})
-   
+    
+    def compute_reachability_mtx(self, area_id):                
+        adj_mtx = self.construct_adjacency_matrix()
+
+        def find_index_by_id( area_id):
+            for index, document in enumerate(self.defense_areas.find()):
+                if document['_id'] == area_id:
+                    return index
+            return None
+
+
+        target_idx = find_index_by_id(area_id) # int(area_id)-1
+        reachable_mtx = warshall_and_single_row(adj_mtx, target_idx)
+        reachable_mtx[target_idx][target_idx] = 1
+        return reachable_mtx
+
     def construct_adjacency_matrix(self):
         """
         Constructs an adjacency matrix based on the edges in the database.

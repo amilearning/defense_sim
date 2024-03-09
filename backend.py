@@ -55,6 +55,30 @@ class DefenseAreaBackend:
             # Perform the operation to add a defense area
             return jsonify({"message": "Defense area added successfully"})
 
+        @self.app.route('/api/add-edges', methods=['POST'])
+        def add_edges():
+            source_id = request.json['source_id']
+            target_id = request.json['target_id']        
+            weight = request.json['weight']            
+            self.console.add_edge(source_id, target_id, weight)
+            mtx = self.console.manager.construct_adjacency_matrix()            
+            self.console.manager.store_adjacency_matrix(mtx)
+
+            # Perform the operation to add a defense area
+            return jsonify({"message": "Edge added successfully"})
+
+            
+        @self.app.route('/api/single-impact-analysis', methods=['POST'])
+        def single_impact_analysis():
+            area_id = request.json['area_id']            
+            reachability_matrix = self.console.manager.compute_reachability_mtx(area_id)
+            # Perform the operation to add a defense area
+            area_id = request.json.get('area_id', 'unknown')            
+            return jsonify({
+                "message": f"single impact analysis done for missile type: {area_id}",
+                "reachability_matrix": reachability_matrix
+            })
+
         @self.app.route('/api/defense-areas', methods=['GET'])
         def get_defense_areas():
             defense_areas = self.mongo.db.defense_areas.find()
