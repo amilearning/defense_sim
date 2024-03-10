@@ -29,6 +29,7 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      missionInfo: [],
       defenseAreas: [],
       adjacencyMatrix: [],
       displayMatrix: [],
@@ -63,6 +64,24 @@ class App extends React.Component {
     return probabilities;
   }
 
+  
+  generateMissileTypeDropdown = () => {
+    if(!this.state.missileTrajectory){    
+      return;
+    }  else{
+      const { missiles } = this.state.missileTrajectory;  
+      return (
+        <select onChange={this.handleMissileTypeDropdownChange}>
+          <option value="">Select Missile Type</option>
+          <option value="">N</option>
+          <option value="">K</option>
+          <option value="">B</option>          
+        </select>
+      );
+    }
+    
+  };
+
   generateMissileDropdown = () => {
     if(!this.state.missileTrajectory){    
       return;
@@ -81,6 +100,14 @@ class App extends React.Component {
   };
 
   
+  
+  handleMissileTypeDropdownChange = (event) => {
+  const selectedIndex = event.target.value;  
+  // this.setState({ missile_to_view: selectedIndex });
+  console.log(selectedIndex)
+  // Handle the selected missile here
+};
+
 handleMissileDropdownChange = (event) => {
   const selectedIndex = event.target.value;
   
@@ -293,8 +320,9 @@ handleMissileDropdownChange = (event) => {
         
         const area_id = prompt('Enter defense area ID:');
         if (area_id !== null && !isNaN(area_id) && Number.isInteger(parseFloat(area_id))) {
-        const value_ = prompt('Enter value:');
-        const tags_input = `lat:${lat_val},lon:${lon_val},value:${value_}`;
+        const value_ = prompt('Enter value:');        
+        const spec_tag = prompt('Enter other tags, e.g.unit:tank');
+        const tags_input = `lat:${lat_val},lon:${lon_val},value:${value_},${spec_tag}`;
         
         await axios.post(`${baseURL}/api/add-defense-area`, { area_id, tags: tags_input });
         this.fetchDefenseAreas();
@@ -347,7 +375,8 @@ handleMissileDropdownChange = (event) => {
           <thead>
             <tr>
               <th style={{ border: '1px solid black', padding: '8px' }}>ID</th>
-              <th style={{ border: '1px solid black', padding: '8px' }}>Tags</th>
+              <th style={{ border: '1px solid black', padding: '8px' }}>Mission Group</th>
+              <th style={{ border: '1px solid black', padding: '8px' }}>Tags</th>              
               <th style={{ border: '1px solid black', padding: '8px' }}>ImpactAnalysis</th>
             </tr>
           </thead>
@@ -355,6 +384,7 @@ handleMissileDropdownChange = (event) => {
             {defenseAreas.map((area) => (
               <tr key={area._id}>
                 <td style={{ border: '1px solid black', padding: '8px' }}>{area._id}</td>
+                <td style={{ border: '1px solid black', padding: '8px' }}>{area.msgroup}</td>
                 <td style={{ border: '1px solid black', padding: '8px' }}>
                   <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                     {Object.entries(area.tags).map(([key, value]) => (
@@ -373,6 +403,60 @@ handleMissileDropdownChange = (event) => {
           </tbody>
         </table>
       </div>
+    );
+  };
+
+  handleMissionInfoCheckboxChange = async (index) =>  {
+    const updatedMissionInfo = [...this.state.missionInfo];
+    updatedMissionInfo[index].status = !updatedMissionInfo[index].status;
+    this.setState({ missionInfo: updatedMissionInfo }, async () => {
+      const { _id, msgroup, status } = updatedMissionInfo[index];
+          
+      try {
+        await axios.post(`${baseURL}/api/update-msinfo`, { _id, msgroup, status });
+      } catch (error) {
+        console.error('Error updating status:', error);
+        // Revert the status change if API call fails
+        updatedMissionInfo[index].status = !updatedMissionInfo[index].status;
+        this.setState({ missionInfo: updatedMissionInfo });
+      }
+      this.fetchMissionInfo();
+      //////////////////////
+      setTimeout(this.resetdisplayMatrix, 500);
+      
+    });
+    
+  };
+
+  MissionTable = ({ missionInfo }) => {
+    return (
+      <div>
+      <h2>Mission Information</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Mission ID</th>
+            <th>Status</th>
+            <th>Mission Group</th>
+          </tr>
+        </thead>
+        <tbody>
+          {missionInfo.map((mission, index) => (
+            <tr key={index}>
+              <td>{mission._id}</td>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={mission.status}
+                  onChange={() => this.handleMissionInfoCheckboxChange(index)}
+                />
+              </td>
+              <td>{mission.msgroup}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
     );
   };
 
@@ -403,6 +487,7 @@ handleMissileDropdownChange = (event) => {
 
   const sourcePoint = new Feature({
     geometry: new Point(coords1),
+    tag: 'defensearea' 
   });
  
 
@@ -456,6 +541,7 @@ handleMissileDropdownChange = (event) => {
           });
           const segmentFeature = new Feature({
             geometry: new LineString([start_segment, end_segment]),
+            tag: 'edges' 
           });
          
           segmentFeature.setStyle(style);
@@ -523,8 +609,9 @@ handleMissileDropdownChange = (event) => {
 
   componentDidMount() {
     this.fetchDefenseAreas(); // Initial fetch
-    this.intervalId = setInterval(this.fetchDefenseAreas, 500); // Fetch defense areas every 1 second
+    this.intervalId = setInterval(this.fetchDefenseAreas, 500); // Fetch defense areas every 1 second    
     this.intervalId2 = setInterval(this.clock_interval, 100); // Update bar plots every 1 second
+    this.intervalId3 = setInterval(this.fetchMissionInfo, 3000); // Fetch defense areas every 1 second
   }
 
   // componentDidMount() {
@@ -536,6 +623,7 @@ handleMissileDropdownChange = (event) => {
   componentWillUnmount() {
     clearInterval(this.intervalId);
     clearInterval(this.intervalId2);
+    clearInterval(this.intervalId3);
   }
 
 
@@ -553,11 +641,65 @@ handleMissileDropdownChange = (event) => {
   };
 
   
+  fetchMissionInfo = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/api/get-msinfo`);
+      this.setState({
+        missionInfo: response.data.missionInfo        
+      });
+
+    } catch (error) {
+      console.error('Error fetching Mission Info:', error);
+    }
+  };
+  
 
 
   handleTabClick = (index) => {
     this.setState({ selectedTab: index });
       
+  };
+  
+  
+  handleAddMission= async () => {
+    try {
+      const mission_id = prompt('Enter Mission  ID:');
+      if (mission_id !== null) {
+      const msgroup = prompt('Enter included Mission groups(format: 1,2,3,..):');
+      await axios.post(`${baseURL}/api/add-msinfo`, { mission_id, msgroup });
+      this.fetchDefenseAreas();
+      }
+    } catch (error) {
+      console.error('Error adding defense area:', error);
+    }
+  };
+
+
+  handleAssignMission= async () => {
+    try {
+      const area_id = prompt('Enter defense area ID:');
+      if (area_id !== null && !isNaN(area_id) && Number.isInteger(parseFloat(area_id))) {
+      const msgroup = prompt('Enter Mission groups for assignment(format: 1,2,3,..):');
+      
+      await axios.post(`${baseURL}/api/assign-msgroup`, { area_id, msgroup });
+      this.fetchDefenseAreas();
+      }
+    } catch (error) {
+      console.error('Error adding defense area:', error);
+    }
+  };
+  
+  handleAddRule = async () => {
+    try {
+      const _id = prompt('Enter rule ID:');
+      if (_id !== null && !isNaN(_id) && Number.isInteger(parseFloat(_id))) {
+      const source_tag = prompt('Enter Source tags');
+      const target_tag = prompt('Enter Target tags');      
+      await axios.post(`${baseURL}/api/add-rule`, { _id, source_tag, target_tag });      
+      }
+    } catch (error) {
+      console.error('Error adding rule:', error);
+    }
   };
 
   handleAddDefenseArea = async () => {
@@ -609,7 +751,7 @@ handleMissileDropdownChange = (event) => {
 
 
   render() {
-    const { defenseAreas, adjacencyMatrix, displayMatrix,selectedTab } = this.state;
+    const { missionInfo, defenseAreas, adjacencyMatrix, displayMatrix,selectedTab } = this.state;
    
     let matrix_input;
     if (displayMatrix.length === 0) {
@@ -631,13 +773,20 @@ handleMissileDropdownChange = (event) => {
             <div className={`tab ${selectedTab === 1 ? 'active' : ''}`} onClick={() => this.handleTabClick(1)}>
               Adjacency Matrix
             </div>
+            <div className={`tab ${selectedTab === 2 ? 'active' : ''}`} onClick={() => this.handleTabClick(2)}>
+              Mission Info
+            </div>
           </div>
           <div className="tab-content">
             {selectedTab === 0 && <this.DefenseAreaTable defenseAreas={defenseAreas} />}
             {selectedTab === 1 && <this.AdjacencyMatrix adjacencyMatrix={matrix_input} defenseAreas={defenseAreas} />}
+            {selectedTab === 2 && <this.MissionTable missionInfo={missionInfo}/>}
           </div>
-          <div>
+          <div>          
+           <button onClick={this.handleAddRule}>Add Rule</button>
             <button onClick={this.handleAddDefenseArea}>Add Defense Area</button>
+            <button onClick={this.handleAssignMission}>Assign Mission Group</button>
+            <button onClick={this.handleAddMission}>Add Mission</button>
             <button onClick={this.handleAddEdge}>Add Edge</button>
             <button onClick={this.resetdisplayMatrix}>reset_adj_mtx</button>
             <button onClick={this.handleMissileInit}>Init Missile</button>
@@ -646,6 +795,7 @@ handleMissileDropdownChange = (event) => {
             <button onClick={this.handleLaunchMissileAll}>Launch All Missiles</button>
           </div>
           {this.generateMissileDropdown()}
+          {this.generateMissileTypeDropdown()}
           {this.generateBarPlots(defenseAreas)}
         </div>       
          {<this.MapComponent  defenseAreas={defenseAreas} matrix_in={matrix_input}/>}

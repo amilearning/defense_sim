@@ -5,7 +5,7 @@ from flask_pymongo import PyMongo
 import schedule
 import time
 
-from defense_sim.models.defense_area import DefenseArea, DefenseDataManager
+from defense_sim.models.defense_area import DefenseDataManager
 
 class DefenseAreaConsole:
     def __init__(self):
@@ -46,7 +46,43 @@ class DefenseAreaBackend:
         self.mongo = PyMongo(self.app)
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")  # Allow WebSocket connections from all origins
         
-    
+        mtx = self.console.manager.construct_adjacency_matrix()
+        self.console.manager.store_adjacency_matrix(mtx)
+        
+
+        @self.app.route('/api/add-rule', methods=['POST'])
+        def add_rule():
+            _id = request.json['_id'] 
+            source_tag = request.json['source_tag']
+            target_tag = request.json['target_tag'] 
+            self.console.manager.store_rule_info(_id, source_tag, target_tag)
+            return jsonify({"message": "Rule added successfully"})
+
+
+        @self.app.route('/api/add-msinfo', methods=['POST'])
+        def add_msinfo():
+            mission_id = request.json['mission_id']
+            msgroup = request.json['msgroup'] 
+            status = 0 # inactive by default
+            self.console.manager.store_mission_info(mission_id,msgroup)
+            return jsonify({"message": "Mission Info added successfully"})
+        
+        @self.app.route('/api/update-msinfo', methods=['POST'])
+        def update_msinfo():
+            mission_id = request.json['_id']
+            msgroup = request.json['msgroup'] 
+            status = request.json['status']             
+            self.console.manager.update_mission_info(mission_id,msgroup,status)
+            return jsonify({"message": "Mission Info updated successfully"})
+
+
+        @self.app.route('/api/assign-msgroup', methods=['POST'])
+        def assign_msgroup():
+            area_id = request.json['area_id']
+            msgroup = request.json['msgroup']
+            self.console.manager.assign_msgroup(area_id,msgroup)
+            return jsonify({"message": "Defense area Mission group added successfully"})
+
         @self.app.route('/api/add-defense-area', methods=['POST'])
         def add_defense_area():
             area_id = request.json['area_id']
@@ -87,6 +123,13 @@ class DefenseAreaBackend:
             return jsonify({
                 'defenseAreas': list(defense_areas),
                 'adjacencyMatrix': adjacency_matrix
+            })
+        
+        @self.app.route('/api/get-msinfo', methods=['GET'])
+        def get_msinfo():
+            missionInfo = self.mongo.db.missions.find()                        
+            return jsonify({
+                'missionInfo': list(missionInfo)
             })
 
 
