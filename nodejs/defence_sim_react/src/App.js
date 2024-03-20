@@ -41,7 +41,8 @@ class App extends React.Component {
       mapreset:true,
       missileTrajectory: null,
       clock_var:true,
-      missile_to_view:null
+      missile_to_view:null,
+      intent_result:null
     };
     
   };
@@ -59,7 +60,7 @@ class App extends React.Component {
   generateRandomProbabilities = (numScenarios) => {
     const probabilities = [];
     for (let i = 0; i < numScenarios; i++) {
-      probabilities.push(Math.random()*0.3);//Math.random());
+      probabilities.push(Math.random()*0.3);
     }
     return probabilities;
   }
@@ -125,7 +126,7 @@ handleMissileDropdownChange = (event) => {
       return;      
     }
    
-    if(!Number.isInteger(parseFloat(this.state.missile_to_view))){
+    if(!Number.isInteger(parseInt(this.state.missile_to_view))){
       return;
     }
 
@@ -143,11 +144,43 @@ handleMissileDropdownChange = (event) => {
       
     } 
     const defenseArea = defenseAreas;
-    const probabilities = this.generateRandomProbabilities(defenseAreas.length);
+    // const probabilities = this.generateRandomProbabilities(defenseAreas.length);
     // barPlots.push(<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} />);
+    console.log('Response with result:', this.state.intent_result);
+    console.log('this.state.missile_to_view:', this.state.missile_to_view);    
+    const probabilities = this.extractProbabilitiesForMissile(this.state.intent_result, parseInt(this.state.missile_to_view));
+    const missile_target_defense_indx = this.state.missileTrajectory.missiles[parseInt(this.state.missile_to_view)].id
+
+    console.log('probabilities with result:', probabilities);
+
+      
+    // for (let i = 0; i < numScenarios; i++) {
+    //   probabilities.push(Math.random()*0.3);
+    // }
     
-    return<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} />;
+    
+
+
+    return<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} target_idx={missile_target_defense_indx}/>;
   }
+
+  extractProbabilitiesForMissile = (response, missileId) => {
+    // Initialize an object to store probabilities for defense areas
+    const probabilities = [];
+    let missileTarget = response[missileId].target;
+    for (let i = 0; i < this.state.defenseAreas.length; i++) {
+        let defenseAreaId = this.state.defenseAreas[i]._id;
+          // Check if the defense area is targeted by the current missile          
+            // Get the probability of being targeted by the current missile
+            let probability = missileTarget[defenseAreaId];            
+            // Append the probability to the probabilities array
+            probabilities.push(probability);
+    }
+      
+    return probabilities;
+  };
+
+
 
   visualizeSingleImpact = async (area_id) => {
     this.state.mapreset = true;
@@ -261,6 +294,7 @@ handleMissileDropdownChange = (event) => {
     this.state.missileTrajectory.launch_missiles();
     console.log("all missiles are launched");
   }
+  
 
   handleLaunchMissile = async () => {
     try {
@@ -285,7 +319,7 @@ handleMissileDropdownChange = (event) => {
         const target_area =  this.state.defenseAreas.find(area => area._id === area_id);
         if (target_area !== null){
           const { lon: tar_lon, lat: tar_lat } = target_area.tags;
-          this.state.missileTrajectory.add_missile( parseFloat(tar_lat), parseFloat(tar_lon));
+          this.state.missileTrajectory.add_missile( parseInt(area_id), parseFloat(tar_lat), parseFloat(tar_lon));
           console.log("missile is added");
         }
       }
@@ -609,9 +643,10 @@ handleMissileDropdownChange = (event) => {
 
   componentDidMount() {
     this.fetchDefenseAreas(); // Initial fetch
-    this.intervalId = setInterval(this.fetchDefenseAreas, 500); // Fetch defense areas every 1 second    
-    this.intervalId2 = setInterval(this.clock_interval, 100); // Update bar plots every 1 second
-    this.intervalId3 = setInterval(this.fetchMissionInfo, 3000); // Fetch defense areas every 1 second
+    this.intervalId2 = setInterval(this.clock_interval, 100); // Update bar plots every 100 ,icrosecond
+    this.intervalId = setInterval(this.fetchDefenseAreas, 100); // Fetch defense areas every 0.5 second    
+    this.intervalId4 = setInterval(this.updateMissileMeasurements, 100); // Fetch defense areas every 0.5 second        
+    this.intervalId3 = setInterval(this.fetchMissionInfo, 10000); // Fetch defense areas every 3 second
   }
 
   // componentDidMount() {
@@ -624,7 +659,36 @@ handleMissileDropdownChange = (event) => {
     clearInterval(this.intervalId);
     clearInterval(this.intervalId2);
     clearInterval(this.intervalId3);
+    clearInterval(this.intervalId4);
   }
+
+  
+  updateMissileMeasurements = async () => {
+    try {
+      // Access missiles directly from the MissileTrajectory instance
+     
+      const { missiles } = this.state.missileTrajectory;  
+      // Create an array to store measurements for each missile
+      const missileMeasurements = missiles.map(missile => ({
+        id: missile.id,
+        lat: missile.lat,
+        lon: missile.lon,
+        launched : missile.launched,
+      }));
+      
+      // Make a POST request to your backend API with the missile measurements
+      const response = await axios.post(`${baseURL}/api/update-missiles-measurements`, { missileMeasurements });
+      if (response.data && response.data.result !== null) {
+        // Handle the response with "result"        
+        this.setState({intent_result: response.data.result});
+      } else {
+        // Handle the response without "result" or with "result" being None        
+      }
+      // Handle the response if needed
+    } catch (error) {
+      console.error('Error updating missile measurements:', error);
+    }
+  };
 
 
   fetchDefenseAreas = async () => {
@@ -732,6 +796,23 @@ handleMissileDropdownChange = (event) => {
   };
 
 
+  handlInitIntentInference = async () => {
+    try {
+      // Ensure that this.state.missileTrajectory is properly initialized
+      if (this.state && this.state.missileTrajectory) {
+        // Retrieve the count of missiles
+        const missileCount = this.state.missileTrajectory.getMissileCount();  
+        // Perform the axios POST request
+        await axios.post(`${baseURL}/api/init-intentinference`, { missileCount });  
+        console.log('Init Intent Inference Successful');
+      } else {
+        console.error('Missile trajectory not properly initialized.');
+      }
+    } catch (error) {
+      console.error('Error Initializing intent inference algorithm:', error);
+    }
+  };
+
   resetdisplayMatrix= async () => {
     
     const {adjacencyMatrix} = this.state;
@@ -793,6 +874,7 @@ handleMissileDropdownChange = (event) => {
             <button onClick={this.handleAddMissile}>Add Missile</button>
             <button onClick={this.handleLaunchMissile}>Launch Missile</button>
             <button onClick={this.handleLaunchMissileAll}>Launch All Missiles</button>
+            <button onClick={this.handlInitIntentInference}>Init IntentInference</button>
           </div>
           {this.generateMissileDropdown()}
           {this.generateMissileTypeDropdown()}

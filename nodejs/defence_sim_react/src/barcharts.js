@@ -23,7 +23,7 @@ class HorizontalBarPlot extends Component {
     }
   }
   buildChart() {
-    const { defenseAreas, probabilities } = this.props;
+    const { defenseAreas, probabilities, target_idx } = this.props;
   
     if (!defenseAreas || !probabilities || probabilities.length === 0) {
       console.error('Invalid data for bar plot.');
@@ -37,7 +37,17 @@ class HorizontalBarPlot extends Component {
     if (this.chartInstance) {
       this.chartInstance.destroy();
     }
-  
+    
+    const customColors = areaIds.map(areaId => {
+      // Add your conditions to determine custom colors based on areaIds
+      if (parseInt(areaId) === target_idx) {
+        return 'rgba(255, 99, 132, 0.5)'; // Red color with transparency      
+      } else {
+        return 'rgba(54, 162, 235, 0.5)'; // Default color with transparency
+      }
+    });
+
+
     // Create a new chart instance with animation disabled
     this.chartInstance = new Chart(ctx, {
       type: 'bar',
@@ -46,7 +56,8 @@ class HorizontalBarPlot extends Component {
         datasets: [{
           label: 'Probability of being attacked',
           data: probabilities,
-          backgroundColor: 'rgba(54, 162, 235, 0.5)',
+          // backgroundColor: 'rgba(54, 162, 235, 0.5)',
+          backgroundColor: customColors,
           borderColor: 'rgba(54, 162, 235, 1.0)',
           borderWidth: 2
         }]

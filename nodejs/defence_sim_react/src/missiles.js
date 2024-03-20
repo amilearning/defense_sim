@@ -102,15 +102,19 @@ class MissileTrajectory {
         
     }
     
-    add_missile( goal_lat, goal_lon){
+    add_missile( target_area_id, goal_lat, goal_lon){
         const tmp_lat = 41.9027;
         const tmp_lon = 128.2837;
-        const tmp_id = 0;
-        const missile = new Missile(tmp_id, tmp_lat, tmp_lon);
+        // const tmp_id = 0;
+        const missile = new Missile(target_area_id, tmp_lat, tmp_lon);
         missile.set_goal(goal_lat, goal_lon);
         this.missiles.push(missile);
     }
     
+    getMissileCount() {
+      return this.missiles.length;
+    }
+
     launch_missile(idx){
         if(this.missiles.length >idx-1){
             this.missiles[idx].launch();

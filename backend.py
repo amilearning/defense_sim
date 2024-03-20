@@ -4,7 +4,7 @@ from flask_socketio import SocketIO, emit
 from flask_pymongo import PyMongo
 import schedule
 import time
-
+import logging
 from defense_sim.models.defense_area import DefenseDataManager
 
 class DefenseAreaConsole:
@@ -39,6 +39,11 @@ class DefenseAreaConsole:
 class DefenseAreaBackend:
     def __init__(self):
         self.app = Flask(__name__)
+        self.app.logger.disabled = True
+        
+        # self.log = logging.getLogger('werkzeug')
+        # self.log.setLevel(logging.ERROR)
+       
         CORS(self.app)  # Enable CORS for all routes
         self.console = DefenseAreaConsole()
         # self.app.config['SECRET_KEY'] = 'your-secret-key'
@@ -49,6 +54,48 @@ class DefenseAreaBackend:
         mtx = self.console.manager.construct_adjacency_matrix()
         self.console.manager.store_adjacency_matrix(mtx)
         
+
+                
+        @self.app.route('/api/update-missiles-measurements', methods=['POST'])
+        def update_missiles_measurements():
+            try:
+                # Get the missile measurements from the request body
+                missile_measurements = request.json['missileMeasurements']                
+                if len(missile_measurements) < 1:
+                    return jsonify({"message": "No missiles"}) 
+                
+                result = self.console.manager.update_missile_info(missile_measurements)
+                # Process the missile measurements
+             
+                    # Update the missile measurements in your backend as needed
+                    # For example, you could store them in a database or perform any other operations                    
+                # Return a success response
+                # return jsonify({"message": "Missile measurements updated successfully"})
+                if result is None:
+                    return jsonify({"message": "Missile measurements updated successfully"})
+                else:
+                    return jsonify({"message": "Missile measurements updated successfully", "result": result})
+            
+            except Exception as e:
+                # Handle any errors that occur during the process
+                return jsonify({"error": str(e)}), 500
+            
+            
+        @self.app.route('/api/init-intentinference', methods=['POST'])
+        def init_intent_inference():
+            try:
+                # Extract missile count from the request body
+                missile_count = request.json['missileCount']
+                self.console.manager.init_intent(int(missile_count))
+                # Assuming self.console.manager.init_intent() initializes the intent inference algorithm
+                # You may need to adjust this based on your application's structure                
+                # Return success response
+                return jsonify({"message": "Intent inference initialization successful"})
+            except Exception as e:
+                # Handle any errors that occur during initialization
+                return jsonify({"error": str(e)})
+            
+            
 
         @self.app.route('/api/add-rule', methods=['POST'])
         def add_rule():

@@ -2,7 +2,10 @@
 from pymongo import MongoClient
 from defense_sim.models.warsahll import warshall_and_single_row
 from defense_sim.models.edge import Edge
+from defense_sim.models.objects import DefenseArea
+from defense_sim.models.IntentInference import IntentInference, Missile
 from copy import copy
+
 class MissionManager:
     def __init__(self):
         self.missions = []
@@ -151,8 +154,22 @@ class DefenseDataManager:
         self.rules = self.db.rules
         self.adj_matrix = self.db.adjacency_matrix
         self.mission_manager = MissionManager()
+        self.intent_machine = IntentInference()
         self.init_mission_manager()
-       
+    
+    def update_missile_info(self,missile_measurements):
+        if self.intent_machine.is_ready is False:
+            return                        
+        result = self.intent_machine.update_measurement(missile_measurements)        
+        return result
+    
+    def init_intent(self, missile_count = 0):
+        if missile_count < 1:
+            return print("zero numnber of missile")
+        print("missile_count =  " + str(missile_count))        
+        self.intent_machine.reset(missile_count, self.defense_areas)                
+        return 
+        
     def store_rule_info(self,_id, source_tag,target_tag ):
         rule_info = {'_id': _id, 'source_tag' : source_tag, 'target_tag': target_tag}
         self.rules.insert_one(rule_info)
