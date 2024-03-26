@@ -4,7 +4,8 @@ from defense_sim.models.objects import DefenseArea
 class Missile:
     def __init__(self, name,  targets=None, type_probabilities=None):
         self.name = name        
-        self.targets = targets if targets is not None else {}
+        self.targets = targets if targets is not None else {}        
+        self.betas = self.targets 
         self.type_probabilities = type_probabilities if type_probabilities is not None else {}
         self.impact_scores = {}
         self._compute_and_store_impact()
@@ -73,6 +74,7 @@ class IntentInference:
         self.missiles.clear()
         for i in range(num_missiles):
             tmp_missile = Missile(name=str(i), targets= {area_id: 0.05 for area_id in defense_area_ids})
+            tmp_missile.betas = {area_id: 0.1 for area_id in defense_area_ids}
             self.add_missile(tmp_missile)   
         print("intent init done")
         self.is_ready = True
@@ -138,6 +140,12 @@ class IntentInference:
         for idx, measurement in enumerate(missile_measurements):                        
             result.append({'id' : self.missiles[idx].name , 'target': self.missiles[idx].targets})        
         
+        return result
+    
+    def update_beta(self,missile_measurements):
+        result = []
+        for idx, measurement in enumerate(missile_measurements):                                    
+            result.append({'id' : self.missiles[idx].name , 'beta': self.missiles[idx].betas})        
         return result
 
  

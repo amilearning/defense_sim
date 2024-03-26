@@ -54,7 +54,29 @@ class DefenseAreaBackend:
         mtx = self.console.manager.construct_adjacency_matrix()
         self.console.manager.store_adjacency_matrix(mtx)
         
-
+        @self.app.route('/api/update-beta', methods=['POST'])
+        def update_betas():
+            try:
+                # Get the missile measurements from the request body
+                missile_measurements = request.json['missileMeasurements']                
+                if len(missile_measurements) < 1:
+                    return jsonify({"message": "No missiles"})                 
+                result = self.console.manager.update_beta_info(missile_measurements)
+                # Process the missile measurements
+             
+                    # Update the missile measurements in your backend as needed
+                    # For example, you could store them in a database or perform any other operations                    
+                # Return a success response
+                # return jsonify({"message": "Missile measurements updated successfully"})
+                if result is None:
+                    return jsonify({"message": "Missile betas updated successfully"})
+                else:
+                    return jsonify({"message": "Missile betas updated successfully", "result": result})
+            
+            except Exception as e:
+                # Handle any errors that occur during the process
+                return jsonify({"error": str(e)}), 500
+            
                 
         @self.app.route('/api/update-missiles-measurements', methods=['POST'])
         def update_missiles_measurements():

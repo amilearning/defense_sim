@@ -42,7 +42,8 @@ class App extends React.Component {
       missileTrajectory: null,
       clock_var:true,
       missile_to_view:null,
-      intent_result:null
+      intent_result:null,
+      beta_result:null
     };
     
   };
@@ -150,6 +151,7 @@ handleMissileDropdownChange = (event) => {
     console.log('this.state.missile_to_view:', this.state.missile_to_view);    
     const probabilities = this.extractProbabilitiesForMissile(this.state.intent_result, parseInt(this.state.missile_to_view));
     const missile_target_defense_indx = this.state.missileTrajectory.missiles[parseInt(this.state.missile_to_view)].id
+    const betas = this.extractBetafromMissile(this.state.beta_result, parseInt(this.state.missile_to_view));
 
     console.log('probabilities with result:', probabilities);
 
@@ -159,9 +161,20 @@ handleMissileDropdownChange = (event) => {
     // }
     
     
+    const horizontalBarPlot = <HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} target_idx={missile_target_defense_indx}/>;
 
+    // New HorizontalBarPlot or your new bar chart component
+    // Adjust the key, and any other props as necessary
+    const betaBarplot =  <HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={betas} target_idx={missile_target_defense_indx}/>;
+  
 
-    return<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} target_idx={missile_target_defense_indx}/>;
+    // return<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} target_idx={missile_target_defense_indx}/>;
+    return (
+      <div>
+        {horizontalBarPlot}      
+        {betaBarplot}
+      </div>
+    );
   }
 
   extractProbabilitiesForMissile = (response, missileId) => {
@@ -178,6 +191,23 @@ handleMissileDropdownChange = (event) => {
     }
       
     return probabilities;
+  };
+
+  
+  extractBetafromMissile = (response, missileId) => {
+    // Initialize an object to store betas for defense areas
+    const betas = [];
+    let missileTarget = response[missileId].beta;
+    for (let i = 0; i < this.state.defenseAreas.length; i++) {
+        let defenseAreaId = this.state.defenseAreas[i]._id;
+          // Check if the defense area is targeted by the current missile          
+            // Get the probability of being targeted by the current missile
+            let beta = missileTarget[defenseAreaId];            
+            // Append the probability to the betas array
+            betas.push(beta);
+    }
+      
+    return betas;
   };
 
 
@@ -404,7 +434,7 @@ handleMissileDropdownChange = (event) => {
   // Define DefenseAreaTable as a method inside the App class
   DefenseAreaTable = ({ defenseAreas }) => {
     return (
-      <div style={{ maxHeight: '300px', overflowY: 'scroll', maxWidth: '50vw' }}>
+      <div style={{ maxHeight: '100px', overflowY: 'scroll', maxWidth: '50vw' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
@@ -646,6 +676,7 @@ handleMissileDropdownChange = (event) => {
     this.intervalId2 = setInterval(this.clock_interval, 100); // Update bar plots every 100 ,icrosecond
     this.intervalId = setInterval(this.fetchDefenseAreas, 100); // Fetch defense areas every 0.5 second    
     this.intervalId4 = setInterval(this.updateMissileMeasurements, 100); // Fetch defense areas every 0.5 second        
+    this.intervalId4 = setInterval(this.updateBetas, 100); // Fetch defense areas every 0.5 second        
     this.intervalId3 = setInterval(this.fetchMissionInfo, 10000); // Fetch defense areas every 3 second
   }
 
@@ -661,6 +692,7 @@ handleMissileDropdownChange = (event) => {
     clearInterval(this.intervalId3);
     clearInterval(this.intervalId4);
   }
+
 
   
   updateMissileMeasurements = async () => {
@@ -689,6 +721,36 @@ handleMissileDropdownChange = (event) => {
       console.error('Error updating missile measurements:', error);
     }
   };
+
+  
+  updateBetas = async () => {
+    try {
+      // Access missiles directly from the MissileTrajectory instance
+     
+      const { missiles } = this.state.missileTrajectory;  
+      // Create an array to store measurements for each missile
+      const missileMeasurements = missiles.map(missile => ({
+        id: missile.id,
+        lat: missile.lat,
+        lon: missile.lon,
+        launched : missile.launched,
+      }));
+      
+      // Make a POST request to your backend API with the missile measurements
+      const response = await axios.post(`${baseURL}/api/update-beta`, { missileMeasurements });
+      if (response.data && response.data.result !== null) {
+        // Handle the response with "result"        
+        this.setState({beta_result: response.data.result});
+      } else {
+        // Handle the response without "result" or with "result" being None        
+      }
+      // Handle the response if needed
+    } catch (error) {
+      console.error('Error updating missile measurements:', error);
+    }
+  };
+
+
 
 
   fetchDefenseAreas = async () => {

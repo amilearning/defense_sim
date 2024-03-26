@@ -163,6 +163,12 @@ class DefenseDataManager:
         result = self.intent_machine.update_measurement(missile_measurements)        
         return result
     
+    def update_beta_info(self,missile_measurements):
+        if self.intent_machine.is_ready is False:
+            return                        
+        result = self.intent_machine.update_beta(missile_measurements)        
+        return result
+    
     def init_intent(self, missile_count = 0):
         if missile_count < 1:
             return print("zero numnber of missile")

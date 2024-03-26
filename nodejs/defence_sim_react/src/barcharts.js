@@ -63,6 +63,7 @@ class HorizontalBarPlot extends Component {
         }]
       },
       options: {
+        responsive: true,        
         indexAxis: 'x',
         scales: {
           x: {
