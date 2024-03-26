@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import Chart from 'chart.js/auto';
 
-class HorizontalBarPlot extends Component {
+class BetaHorizontalBarPlot extends Component {
   constructor(props) {
     super(props);
     this.chartRef = React.createRef();
@@ -43,7 +43,7 @@ class HorizontalBarPlot extends Component {
       if (parseInt(areaId) === target_idx) {
         return 'rgba(255, 99, 132, 0.5)'; // Red color with transparency      
       } else {
-        return 'rgba(54, 162, 235, 0.5)'; // Default color with transparency
+        return 'rgba(0, 255, 0, 0.3)'; // Default color with transparency
       }
     });
 
@@ -54,7 +54,7 @@ class HorizontalBarPlot extends Component {
       data: {
         labels: areaIds,
         datasets: [{
-          label: 'Probability of being attacked',
+          label: 'Beta',
           data: probabilities,
           // backgroundColor: 'rgba(54, 162, 235, 0.5)',
           backgroundColor: customColors,
@@ -84,4 +84,4 @@ class HorizontalBarPlot extends Component {
   }
 }
 
-export default HorizontalBarPlot;
+export default BetaHorizontalBarPlot;

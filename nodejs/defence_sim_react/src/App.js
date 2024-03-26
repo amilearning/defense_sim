@@ -18,6 +18,7 @@ import './App.css'; // Import CSS for styling
 import XYZ from 'ol/source/XYZ';
 
 import HorizontalBarPlot from './barcharts'; // Adjust the path as per your file structure
+import BetaHorizontalBarPlot from './betacharts'; // Adjust the path as per your file structure
 import MissileTrajectory from './missiles'; // Adjust the path as per your file structure
 
 const baseURL = 'http://127.0.0.1:5000'; // Base URL of your Flask backend
@@ -165,7 +166,7 @@ handleMissileDropdownChange = (event) => {
 
     // New HorizontalBarPlot or your new bar chart component
     // Adjust the key, and any other props as necessary
-    const betaBarplot =  <HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={betas} target_idx={missile_target_defense_indx}/>;
+    const betaBarplot =  <BetaHorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={betas} target_idx={missile_target_defense_indx}/>;
   
 
     // return<HorizontalBarPlot key={defenseArea.id} defenseAreas={defenseAreas} probabilities={probabilities} target_idx={missile_target_defense_indx}/>;
