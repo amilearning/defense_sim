@@ -30,21 +30,35 @@ class Missile:
         self.states = None
         self.cur_state = None
         self.idx = 0
+        self.update_step = 20
         self.landed = False
+
+        
+        
     
     def step(self):
         if self.idx < len(self.states)-1:
-            self.idx+=20
+            self.idx+=self.update_step
         
         if self.idx > len(self.states)-1:
             self.idx = len(self.states)-1           
         self.cur_state = self.states[self.idx,:]
 
+    def get_one_step_pred(self):
+        tmp_idx = self.idx +self.update_step
+        if tmp_idx > len(self.states)-1:
+            tmp_idx = len(self.states)-1
+        return self.states[tmp_idx,:]
+        
     def check_if_landed(self):
         distance = np.sqrt((self.terminal_state[1] - self.cur_state[1])**2 + (self.terminal_state[2] - self.cur_state[2])**2)
         if distance < 5 and abs(self.cur_state[3]) < 10:
             self.landed = True 
         
+        # data = [t, x, y, z, U, V, W, U_dot, V_dot, W_dot, g, n_x, n_y, n_z, n,...
+        #     phi, theta, psi, alfa, beta, alfa_t, delta_w, delta_k, delta_w_T, delta_k_T, P, Q, R, x_sm, x_sp];
+        #     param = [coordinate(1), coordinate(2), fuel_rate, gamma_pb];
+
     def data_to_state(self,data):
         if len((data.shape)) == 1:
             return data[:4]
@@ -190,7 +204,14 @@ class SimulationMain:
                 missile.check_if_landed()
                 missile.step()
                 
-
+                for defense_area in self.defense_areas:
+                    # P(x_k+1 | x_k, defense_i)
+                    pred_normal_mu = np.zeros(missile.cur_state.shape)    
+                    pred_normal_sigma = np.ones(missile.cur_state.shape)*1e5
+                    if defense_area.id == missile.target_id:
+                        pred_state = missile.get_one_step_pred()                        
+                        pred_normal_mu = pred_state + np.random.randn(*pred_state.shape)*5e-2
+                        pred_normal_sigma = np.ones(pred_state.shape)*1e1                    
             
             self.visualize_missile_paths(selected_missiles, lines)
             # t_idx +=1
