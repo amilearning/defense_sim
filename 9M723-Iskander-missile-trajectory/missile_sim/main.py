@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 
 from mpl_toolkits.mplot3d import Axes3D
 from util import get_relative_displacement
-
+import torch 
+import gpytorch
+from gpymodel import IndependentMultitaskGPModelApproximate 
 # random.seed(1)
 
 
@@ -106,11 +108,116 @@ class SimulationMain:
         self.origin_utm = None
         self.init_defense_areas()
         self.load_missiles()
+        
+
         self.missile_target_assign()
+        gptrain = True
+        if gptrain:
+            self.get_traj_data()
+        else:
+            self.load_model()
 
+    def load_model(self):        
 
+        self.model = IndependentMultitaskGPModelApproximate(inducing_points_num=200, input_dim=4, num_tasks=3).to(torch.device("cuda"))       # Independent
+        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=3).to(torch.device("cuda"))   
+        # Load the state dictionaries
+        checkpoint = torch.load('gpytorch_model.pth')
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.likelihood.load_state_dict(checkpoint['likelihood_state_dict'])
+        self.model.eval()
+        self.likelihood.eval()
     
         
+    def get_traj_data(self):
+        
+        missile_state_list = []      
+        input_xs = []  
+        output_ys = []
+        for missile in self.missiles:
+            
+            m_state = self.missiles[0].states[:-1,1:] 
+            output_y = self.missiles[0].states[1:,1:] - m_state
+            missile_idx = np.ones(m_state.shape[0])*self.missiles[0].target_id
+            # x, y, z, delta
+            input_x = np.hstack([m_state,missile_idx.reshape(len(m_state),1)])            
+            input_xs.append(input_x)
+            output_ys.append(output_y)
+
+        X = torch.tensor(input_xs).view(-1,4).cuda().float()            
+        y = torch.tensor(output_ys).view(-1,3).cuda().float() 
+        self.model = IndependentMultitaskGPModelApproximate(inducing_points_num=200, input_dim=4, num_tasks=3).to(torch.device("cuda"))       # Independent
+        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=3).to(torch.device("cuda"))   
+        
+        self.optimizer = torch.optim.Adam([
+            {'params': self.model.parameters()},
+            {'params': self.likelihood.parameters()},
+        ], lr=0.01)    # Includes GaussianLikelihood parameters
+
+        # GP marginal log likelihood
+        # p(y | x, X, Y) = ∫p(y|x, f)p(f|X, Y)df
+        self.mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=y.shape[0]).to(torch.device("cuda"))     
+        n_epoch = 1
+        training_iter = len(X)*n_epoch
+        batch_count = 0
+        prev_val_loss = 1e10
+        converge_count = 0
+        for i in range(training_iter):
+            self.model.train()
+            self.likelihood.train()  
+            if batch_count > len(X)-1:
+                batch_count = 0    
+            self.optimizer.zero_grad()    
+            # with gpytorch.settings.cholesky_jitter(1e-1):        
+            # output = self.model_accel(self.batch_x_data[batch_count])
+            # rand_x = self.batch_x_data[batch_count]+torch.randn(self.batch_x_data[batch_count].shape).to(torch.device("cuda"))*1e-1
+            output = self.model(X)
+            
+            loss = -self.mll(output, y).mean()
+            loss.backward()
+            print('Iter %d/%d - Loss: %.5f' % (i + 1, training_iter, loss.item()))
+            self.optimizer.step()
+            batch_count+=1
+            
+
+            self.model.eval()
+            self.likelihood.eval()
+            self.optimizer.zero_grad()   
+            # test_batch = next(iter(self.test_dataloader))
+            # x_test =  test_batch[:,:,0:6]
+            # y_test =  test_batch[:,:,6:]
+            # plt.clf()
+            # mse_val_loss = self.draw_output(x_test,y_test)
+            # print(mse_val_loss)
+            with torch.no_grad(), gpytorch.settings.fast_pred_var():    
+                # mse_val_loss = self.validation()
+                print('validation loss = ' + str(loss.item()))
+            ### Save and Load model 
+            if prev_val_loss < loss.item():                                 
+                converge_count = converge_count+1 
+            if converge_count > 2: 
+                model_file_name = os.path.join('./', 'gp_model'+str(i) +'.pth')                
+                likelihood_file_name = os.path.join('./', 'gp_liklihood'+str(i) +'.pth')
+                torch.save({
+                            'model_state_dict': self.model.state_dict(),
+                            'likelihood_state_dict': self.likelihood.state_dict()
+                        }, 'gpytorch_model.pth')
+                
+
+                # torch.save(self.model.state_dict(), model_file_name)
+                # torch.save(self.likelihood.state_dict(), likelihood_file_name)
+                print("Loss converged --> Model save and return from training process")                
+                break
+            
+            prev_val_loss = loss.item()
+            self.optimizer.zero_grad() 
+
+
+
+
+
+        print(1)
+
 
     def missile_target_assign(self):
         for missile in self.missiles:
@@ -131,11 +238,23 @@ class SimulationMain:
         for i, (lat, lon) in enumerate(self.target_lat_and_lon):
             # x, y, _ = self.latlon_to_utm(lat, lon)
             vec = get_relative_displacement(self.launch_site_lat_lon[0], self.launch_site_lat_lon[1], lat, lon)
+
             # x -= self.origin_utm[0]
             # y -= self.origin_utm[1]
             area = DefenceArea(i, lon, lat)
-            area.utm_x = vec[0]/1000 # in km
-            area.utm_y = vec[1]/1000 # in km
+
+            if i ==0:
+                area.utm_x = 145
+                area.utm_y = 0
+            elif i ==1:
+                area.utm_x = 150
+                area.utm_y = 0
+            elif i ==2:
+                area.utm_x = 155
+                area.utm_y = 0
+            else:
+                area.utm_x = vec[0]/1000 # in km
+                area.utm_y = vec[1]/1000 # in km
             self.defense_areas.append(area)
 
     
@@ -173,14 +292,14 @@ class SimulationMain:
     def draw_defense_area_circles(self, ax):
         for area in self.defense_areas:
             theta = np.linspace(0, 2*np.pi, 100)
-            x = area.utm_x + 5 * np.cos(theta)  # Radius of 50 meters
-            y = area.utm_y + 5 * np.sin(theta)
+            x = area.utm_x + 1 * np.cos(theta)  # Radius of 50 meters
+            y = area.utm_y + 1 * np.sin(theta)
             z = np.zeros_like(x)  # z = 0 for all points
             ax.plot(x, y, z, color='r')  # Red circles
 
 
     def sim_loop(self):        
-        num_missiles = 5
+        num_missiles = 7
         selected_missiles = random.sample(self.missiles, num_missiles)
         all_landed = False
         
@@ -188,9 +307,9 @@ class SimulationMain:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         lines = [ax.plot([], [], [])[0] for _ in selected_missiles]
-        ax.set_xlim(-0, 500)
-        ax.set_ylim(-500, 0)
-        ax.set_zlim(0, 350)  # Adjust based on expected altitude range
+        ax.set_xlim(-0, 200)
+        ax.set_ylim(-10, 10)
+        ax.set_zlim(-10, 50)  # Adjust based on expected altitude range
         ax.set_xlabel('X (meters)')
         ax.set_ylabel('Y (meters)')
         ax.set_zlabel('Altitude (meters)')
@@ -212,6 +331,15 @@ class SimulationMain:
                         pred_state = missile.get_one_step_pred()                        
                         pred_normal_mu = pred_state + np.random.randn(*pred_state.shape)*5e-2
                         pred_normal_sigma = np.ones(pred_state.shape)*1e1                    
+                        
+                        
+                        input_x = np.hstack([missile.cur_state[1:4:], np.array(defense_area.id)])
+                        input_x = torch.tensor(input_x).view(1,-1).cuda().float()
+                        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+                            observed_pred = self.likelihood(self.model(input_x))
+                            
+                            output = [observed_pred.mean, observed_pred.stddev]
+
             
             self.visualize_missile_paths(selected_missiles, lines)
             # t_idx +=1
@@ -225,6 +353,7 @@ if __name__ == "__main__":
     sim = SimulationMain()    
     # Perform a simulation step
     sim.sim_loop()
+    print(1)
 # class simulation_main
 
 
